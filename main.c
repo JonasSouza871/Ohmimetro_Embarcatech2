@@ -6,234 +6,204 @@
  #include <stdio.h>
  #include <math.h>
  #include <float.h>
- #include <string.h> // Necessário para strlen
+ #include <string.h>
  #include "pico/stdlib.h"
  #include "hardware/adc.h"
  #include "hardware/i2c.h"
  #include "libs/Display_Bibliotecas/ssd1306.h"
- #include "libs/Display_Bibliotecas/font.h" // Assumindo que a fonte tem largura ~6px
-
+ #include "libs/Display_Bibliotecas/font.h" // Assume fonte 8x8
+ 
+ // Definições de hardware
  #define I2C_PORT      i2c1
  #define I2C_SDA_PIN   14
  #define I2C_SCL_PIN   15
  #define OLED_ADDR     0x3C
  #define ADC_PIN       28       // GPIO28 → ADC2
- #define R_KNOWN       10000.0f // Valor do resistor conhecido (10k Ohms)
- #define ADC_RES       4095.0f // Resolução máxima do ADC (12-bit)
-
- // --- Constantes da Interface ---
- #define OLED_WIDTH    128
- #define OLED_HEIGHT   64
- #define FONT_WIDTH    6  // Largura aproximada de um caractere da fonte (ajuste se necessário)
- #define FONT_HEIGHT   8  // Altura da fonte
- #define PADDING       2  // Espaçamento da borda
- #define LINE_SPACING  FONT_HEIGHT // Espaço entre linhas de texto (igual à altura da fonte)
- // -----------------------------
-
- // Valores base da série E24
- static const float E24_BASE[24] = {
-     10,11,12,13,15,16,18,20,
-     22,24,27,30,33,36,39,43,
-     47,51,56,62,68,75,82,91
+ #define RESISTOR_CONHECIDO 10000.0f // 10 kΩ
+ #define RESOLUCAO_ADC 4095.0f  // 12-bit
+ 
+ // Constantes da Interface
+ #define LARGURA_OLED    128
+ #define ALTURA_OLED     64
+ #define LARGURA_FONTE   8 // Largura real de um caractere 8x8
+ #define ALTURA_FONTE    8  // Altura da fonte
+ #define ESPACAMENTO     2  // Espaçamento da borda
+ #define ESPACO_LINHA    ALTURA_FONTE
+ #define SIMBOLO_OHM     127 // Caractere usado para representar Ω (Ohm)
+ #define POSICAO_VALOR_X 80  // Posição X fixa para início dos valores
+ 
+ // Série E24
+ static const float VALORES_E24[24] = {
+     10, 11, 12, 13, 15, 16, 18, 20,
+     22, 24, 27, 30, 33, 36, 39, 43,
+     47, 51, 56, 62, 68, 75, 82, 91
  };
-
- /* Nomes completos das cores para as faixas */
- static const char *COLOR_NAME[10] = {
-     "prata",    // (-2) - Não usado neste código atualmente
-     "ouro",     // (-1) - Não usado neste código atualmente
-     "preto",    // (0)
-     "marrom",   // (1)
-     "vermelho", // (2)
-     "laranja",  // (3)
-     "amarelo",  // (4)
-     "verde",    // (5)
-     "azul",     // (6)
-     "violeta"   // (7)
-     // Índices 8 e 9 (Cinza, Branco) não mapeados aqui
+ 
+ // Nomes das cores
+ static const char *NOMES_CORES[10] = {
+     "Prata", "Ouro", "Preto", "Marrom",
+     "Vermelho", "Laranja", "Amarelo",
+     "Verde", "Azul", "Violeta"
  };
-
- // Função auxiliar para desenhar texto com alinhamento à direita na tela
- void ssd1306_draw_string_right_aligned(ssd1306_t *p, const char *text, uint8_t y, bool color) {
-     int text_width = strlen(text) * FONT_WIDTH; // Calcula a largura do texto em pixels
-     int x_pos = OLED_WIDTH - PADDING - text_width; // Calcula a posição X para alinhar à direita
-     if (x_pos < PADDING) x_pos = PADDING; // Garante que não saia da tela à esquerda
-     ssd1306_draw_string(p, text, x_pos, y, color); // Desenha a string
+ 
+ // Função para inicializar o hardware
+ void inicializar_hardware() {
+     stdio_init_all(); // Inicializa a comunicação serial
+     i2c_init(I2C_PORT, 400000); // Inicializa a comunicação I2C
+     gpio_set_function(I2C_SDA_PIN, GPIO_FUNC_I2C); // Configura o pino SDA para I2C
+     gpio_set_function(I2C_SCL_PIN, GPIO_FUNC_I2C); // Configura o pino SCL para I2C
+     gpio_pull_up(I2C_SDA_PIN); // Habilita o pull-up no pino SDA
+     gpio_pull_up(I2C_SCL_PIN); // Habilita o pull-up no pino SCL
+     adc_init(); // Inicializa o ADC
+     adc_gpio_init(ADC_PIN); // Configura o pino do ADC
  }
-
- int main(void) {
-     stdio_init_all(); // Inicializa stdio (para debug, se necessário)
-
-     // Inicializa I2C e OLED
-     i2c_init(I2C_PORT, 400000); // Inicializa I2C1 a 400kHz
-     gpio_set_function(I2C_SDA_PIN, GPIO_FUNC_I2C); // Define pino SDA
-     gpio_set_function(I2C_SCL_PIN, GPIO_FUNC_I2C); // Define pino SCL
-     gpio_pull_up(I2C_SDA_PIN); // Habilita pull-up interno no SDA
-     gpio_pull_up(I2C_SCL_PIN); // Habilita pull-up interno no SCL
-     ssd1306_t oled; // Cria a estrutura do OLED
-     // Inicializa o OLED 128x64, sem rotação, com endereço e porta I2C definidos
-     ssd1306_init(&oled, OLED_WIDTH, OLED_HEIGHT, false, OLED_ADDR, I2C_PORT);
-     ssd1306_config(&oled); // Aplica configurações padrão ao OLED
-
-     // Inicializa ADC
-     adc_init(); // Inicializa o módulo ADC
-     adc_gpio_init(ADC_PIN); // Habilita a função ADC no pino GPIO28
-
-     while (true) { // Loop principal infinito
-         // --- Leitura ADC ---
-         adc_select_input(2); // Seleciona o canal ADC 2 (GPIO28)
-         float sum = 0;
-         // Faz múltiplas leituras para obter uma média e reduzir ruído
-         for (int i = 0; i < 100; ++i) {
-            sum += adc_read(); // Lê o valor do ADC
-            sleep_us(100); // Pequeno delay entre leituras
-         }
-         float adc_val = sum / 100.0f; // Calcula a média das leituras
-
-         // --- Cálculo da Resistência Medida ---
-         float r_meas = 0.0f;
-         // Verifica se a leitura ADC não está no máximo (evita divisão por zero/infinito)
-         if (adc_val < ADC_RES - 1) { // Subtrai 1 como margem de segurança
-            // Fórmula do divisor de tensão: R_medido = (R_conhecido * V_medido) / (V_total - V_medido)
-            // Aqui, V_medido é proporcional a adc_val e V_total a ADC_RES
-            r_meas = (R_KNOWN * adc_val) / (ADC_RES - adc_val);
-         } else {
-            r_meas = INFINITY; // Se ADC no máximo, considera circuito aberto (resistência infinita)
-         }
-
-         // --- Aproximação para Série E24 ---
-         float best_val = 0;          // Melhor valor E24 encontrado
-         float best_diff = FLT_MAX;   // Menor diferença encontrada (inicializa com valor máximo)
-         int best_exp = 0;            // Expoente do melhor valor (para as cores)
-         int best_idx = 0;            // Índice na E24_BASE do melhor valor (para as cores)
-         bool found_e24 = false;      // Flag para indicar se um valor E24 razoável foi encontrado
-
-         // Só procura valor E24 se a medição for válida (finita e positiva)
-         if (isfinite(r_meas) && r_meas > 0) {
-             // Testa diferentes ordens de magnitude (10^0 a 10^6 -> Ohms a MegaOhms)
-             for (int exp = 0; exp <= 6; ++exp) {
-                 // Testa cada valor base da série E24
-                 for (int i = 0; i < 24; ++i) {
-                     // Calcula o valor candidato E24 (base * 10^expoente)
-                     float cand = E24_BASE[i] * powf(10, exp);
-                     // Calcula a diferença em escala logarítmica (melhor para resistores)
-                     float diff = fabsf(logf(cand) - logf(r_meas));
-                     // Se a diferença atual for menor que a melhor encontrada até agora...
-                     if (diff < best_diff) {
-                         best_diff = diff; // Atualiza a melhor diferença
-                         best_val  = cand; // Atualiza o melhor valor E24
-                         best_exp  = exp;  // Guarda o expoente
-                         best_idx  = i;    // Guarda o índice da base E24
-                         found_e24 = true; // Marca que um valor foi encontrado
-                     }
+ 
+ // Função para ler o valor do ADC
+ float ler_adc() {
+     adc_select_input(2); // Seleciona o canal ADC
+     float soma = 0;
+     for (int i = 0; i < 100; ++i) {
+         soma += adc_read(); // Lê o valor do ADC
+         sleep_us(100); // Espera 100 microsegundos
+     }
+     return soma / 100.0f; // Retorna a média dos valores lidos
+ }
+ 
+ // Função para calcular a resistência medida
+ float calcular_resistencia(float valor_adc) {
+     if (valor_adc < RESOLUCAO_ADC - 1) {
+         return (RESISTOR_CONHECIDO * valor_adc) / (RESOLUCAO_ADC - valor_adc);
+     } else {
+         return INFINITY; // Retorna infinito se o valor do ADC estiver no máximo
+     }
+ }
+ 
+ // Função para aproximar a resistência medida ao valor mais próximo da série E24
+ void aproximar_e24(float resistencia, float *melhor_valor, int *melhor_exp, int *melhor_idx) {
+     float melhor_diferenca = FLT_MAX;
+     bool encontrado = false;
+ 
+     if (isfinite(resistencia) && resistencia > 0) {
+         for (int e = 0; e <= 6; ++e) {
+             for (int i = 0; i < 24; ++i) {
+                 float candidato = VALORES_E24[i] * powf(10, e);
+                 float diferenca = fabsf(logf(candidato) - logf(resistencia));
+                 if (diferenca < melhor_diferenca) {
+                     melhor_diferenca = diferenca;
+                     *melhor_valor = candidato;
+                     *melhor_exp = e;
+                     *melhor_idx = i;
+                     encontrado = true;
                  }
              }
          }
-
-         // --- Determinação das Cores das Faixas ---
-         const char *cores[3] = {"---", "---", "---"}; // Valores padrão caso não encontre E24
-         if (found_e24) {
-             int base = (int)E24_BASE[best_idx]; // Pega o valor base (ex: 47 para 4.7k)
-             int dig1_idx = (base / 10);         // Índice da cor do primeiro dígito
-             int dig2_idx = (base % 10);         // Índice da cor do segundo dígito
-             int mult_idx = best_exp;            // Índice da cor do multiplicador
-
-             // Mapeia os índices para os nomes das cores, adicionando 2 (offset no array COLOR_NAME)
-             // e verificando os limites do array (0 a 7 para preto a violeta)
-             if (dig1_idx >= 0 && dig1_idx <= 7) cores[0] = COLOR_NAME[dig1_idx + 2];
-             if (dig2_idx >= 0 && dig2_idx <= 7) cores[1] = COLOR_NAME[dig2_idx + 2];
-             if (mult_idx >= 0 && mult_idx <= 7) cores[2] = COLOR_NAME[mult_idx + 2];
-             // Nota: Multiplicadores prata (-2) e ouro (-1) não estão implementados aqui.
-         }
-
-
-         // --- Desenho da Interface no OLED ---
-         ssd1306_fill(&oled, false); // Limpa o buffer do display (preenche com preto)
-
-         char buf[20]; // Buffer para formatar strings
-         uint8_t current_y = PADDING; // Posição Y inicial para desenhar (começa no topo com padding)
-
-         // Linha 1: Valor ADC
-         snprintf(buf, sizeof buf, "%.0f", adc_val); // Formata o valor ADC como inteiro
-         ssd1306_draw_string(&oled, "ADC:", PADDING, current_y, true); // Desenha o label à esquerda
-         ssd1306_draw_string_right_aligned(&oled, buf, current_y, true); // Desenha o valor à direita
-         current_y += LINE_SPACING; // Move a posição Y para a próxima linha
-
-         // Linha 2: Resistor Fixo (R_KNOWN)
-         snprintf(buf, sizeof buf, "%.0f", R_KNOWN); // Formata o valor de R_KNOWN
-         ssd1306_draw_string(&oled, "R Fixo:", PADDING, current_y, true);
-         ssd1306_draw_string_right_aligned(&oled, buf, current_y, true);
-         current_y += LINE_SPACING;
-
-         // Linha 3: Resistência Medida (R_MEAS)
-         if (isinf(r_meas)) {
-             snprintf(buf, sizeof buf, "Aberto"); // Se infinito, mostra "Aberto"
-         } else if (r_meas < 1.0 && r_meas > 0) {
-             snprintf(buf, sizeof buf, "%.2f", r_meas); // Mostra decimais para < 1 Ohm
-         } else if (r_meas == 0) { // Pode indicar curto-circuito
-             snprintf(buf, sizeof buf, "0");
-         } else {
-             snprintf(buf, sizeof buf, "%.0f", r_meas); // Formato inteiro para >= 1 Ohm
-         }
-         ssd1306_draw_string(&oled, "R Medido:", PADDING, current_y, true);
-         ssd1306_draw_string_right_aligned(&oled, buf, current_y, true);
-         current_y += LINE_SPACING;
-
-         // Linha 4: Resistência Comercial (E24)
-         if (found_e24) {
-             // ****************************************************************
-             // * ALTERAÇÃO AQUI: Removida a formatação com 'k' e 'M'         *
-             // * Sempre mostra o valor E24 completo como número inteiro.      *
-             // ****************************************************************
-             snprintf(buf, sizeof buf, "%.0f", best_val); // Formata sempre como inteiro
-         } else {
-             snprintf(buf, sizeof buf, "---"); // Mostra "---" se não encontrou E24
-         }
-         ssd1306_draw_string(&oled, "R Comercial:", PADDING, current_y, true); // Desenha o label (R Comercial:)
-         ssd1306_draw_string_right_aligned(&oled, buf, current_y, true); // Desenha o valor E24 formatado (ou "---")
-         current_y += LINE_SPACING; // Move Y para a posição da linha separadora
-
-
-         // --- Separador Horizontal ---
-         uint8_t line_y = current_y; // Posição Y da linha (logo abaixo do último texto)
-         // Desenha a linha horizontal com padding nas laterais
-         ssd1306_hline(&oled, PADDING, OLED_WIDTH - 1 - PADDING, line_y, true);
-         current_y = line_y + 3; // Move Y para baixo da linha, com um pequeno espaço
-
-
-         // --- Faixas de Cor ---
-         const char* label1 = "1a:"; // Label da primeira faixa
-         const char* label2 = "2a:"; // Label da segunda faixa
-         const char* label3 = "3a:"; // Label da terceira faixa
-         // Calcula a largura dos labels (assumindo que são iguais)
-         int label_width = strlen(label1) * FONT_WIDTH;
-         // Calcula a posição X para os nomes das cores (logo após o label + pequeno espaço)
-         int color_name_x = PADDING + label_width + FONT_WIDTH / 2;
-
-         // Garante que a posição X do nome da cor não saia da tela se for muito longa
-         if (color_name_x > OLED_WIDTH - (5 * FONT_WIDTH)) { // Estima 5 chars para o nome da cor
-              color_name_x = PADDING + label_width + 1; // Deixa só 1 pixel de espaço se apertado
-         }
-
-         // Desenha a 1ª Faixa
-         ssd1306_draw_string(&oled, label1, PADDING, current_y, true); // Desenha "1a:"
-         ssd1306_draw_string(&oled, cores[0], color_name_x, current_y, true); // Desenha o nome da cor
-         current_y += LINE_SPACING; // Move Y para a próxima linha
-
-         // Desenha a 2ª Faixa
-         ssd1306_draw_string(&oled, label2, PADDING, current_y, true); // Desenha "2a:"
-         ssd1306_draw_string(&oled, cores[1], color_name_x, current_y, true); // Desenha o nome da cor
-         current_y += LINE_SPACING; // Move Y para a próxima linha
-
-         // Desenha a 3ª Faixa (apenas se couber na tela)
-         if (current_y <= (OLED_HEIGHT - FONT_HEIGHT)) { // Verifica se há espaço vertical
-            ssd1306_draw_string(&oled, label3, PADDING, current_y, true); // Desenha "3a:"
-            ssd1306_draw_string(&oled, cores[2], color_name_x, current_y, true); // Desenha o nome da cor
-         }
-
-         // --- Atualização do Display ---
-         ssd1306_send_data(&oled); // Envia o buffer desenhado para o display OLED
-         sleep_ms(200); // Pausa para evitar atualização muito rápida e permitir leitura
      }
-
-     return 0; // Esta linha nunca será alcançada devido ao loop infinito
+ 
+     if (!encontrado) {
+         *melhor_valor = 0;
+         *melhor_exp = 0;
+         *melhor_idx = 0;
+     }
  }
+ 
+ // Função para determinar as cores das faixas do resistor
+ void determinar_cores(int d1, int d2, int multiplicador, const char **cores) {
+     cores[0] = (d1 >= 0 && d1 <= 7) ? NOMES_CORES[d1 + 2] : "---";
+     cores[1] = (d2 >= 0 && d2 <= 7) ? NOMES_CORES[d2 + 2] : "---";
+     cores[2] = (multiplicador >= 0 && multiplicador <= 7) ? NOMES_CORES[multiplicador + 2] : "---";
+ }
+ 
+ // Função para atualizar o display OLED
+ void atualizar_display(ssd1306_t *oled, float valor_adc, float resistencia, float melhor_valor_e24, const char **cores) {
+     ssd1306_fill(oled, false); // Limpa o display
+ 
+     char buffer[25];
+     uint8_t y = ESPACAMENTO;
+ 
+     // Exibir valor do ADC
+     snprintf(buffer, sizeof(buffer), "%.0f", valor_adc);
+     ssd1306_draw_string(oled, "ADC:", ESPACAMENTO, y, false);
+     ssd1306_draw_string(oled, buffer, POSICAO_VALOR_X, y, false);
+     y += ESPACO_LINHA;
+ 
+     // Exibir resistor conhecido
+     snprintf(buffer, sizeof(buffer), "%.0f", RESISTOR_CONHECIDO);
+     ssd1306_draw_string(oled, "R Fixo:", ESPACAMENTO, y, false);
+     ssd1306_draw_string(oled, buffer, POSICAO_VALOR_X, y, false);
+     y += ESPACO_LINHA;
+ 
+     // Exibir resistencia medida
+     ssd1306_draw_string(oled, "R Medido:", ESPACAMENTO, y, false);
+     if (isinf(resistencia)) {
+         strcpy(buffer, "Aberto");
+     } else if (resistencia < 1.0f && resistencia > 0.0f) {
+         snprintf(buffer, sizeof(buffer), "%.2f %c", resistencia, SIMBOLO_OHM);
+     } else if (resistencia == 0.0f) {
+         snprintf(buffer, sizeof(buffer), "0 %c", SIMBOLO_OHM);
+     } else {
+         snprintf(buffer, sizeof(buffer), "%.0f %c", resistencia, SIMBOLO_OHM);
+     }
+     ssd1306_draw_string(oled, buffer, POSICAO_VALOR_X, y, false);
+     y += ESPACO_LINHA;
+ 
+     // Exibir resistencia comercial E24
+     ssd1306_draw_string(oled, "R E24:", ESPACAMENTO, y, false);
+     if (melhor_valor_e24 > 0) {
+         snprintf(buffer, sizeof(buffer), "%.0f %c", melhor_valor_e24, SIMBOLO_OHM);
+     } else {
+         strcpy(buffer, "---");
+     }
+     ssd1306_draw_string(oled, buffer, POSICAO_VALOR_X, y, false);
+     y += ESPACO_LINHA;
+ 
+     // Separador
+     if (y > ALTURA_OLED - 3 - (3 * ALTURA_FONTE)) {
+         y = ALTURA_OLED - 3 - (3 * ALTURA_FONTE);
+     }
+     ssd1306_hline(oled, ESPACAMENTO, LARGURA_OLED - 1 - ESPACAMENTO, y, true);
+     y += 3;
+ 
+     // Exibir faixas de cor
+     const char *rotulos[3] = {"1a:", "2a:", "3a:"};
+     int posicao_nome_cor = ESPACAMENTO + (strlen(rotulos[0]) * LARGURA_FONTE) + 2;
+ 
+     for (int i = 0; i < 3 && (y + ALTURA_FONTE) <= ALTURA_OLED; ++i) {
+         ssd1306_draw_string(oled, rotulos[i], ESPACAMENTO, y, false);
+         ssd1306_draw_string(oled, cores[i], posicao_nome_cor, y, false);
+         y += ESPACO_LINHA;
+     }
+ 
+     ssd1306_send_data(oled); // Envia os dados para o display
+ }
+ 
+ int main(void) {
+     inicializar_hardware(); // Inicializa o hardware
+ 
+     ssd1306_t oled;
+     ssd1306_init(&oled, LARGURA_OLED, ALTURA_OLED, false, OLED_ADDR, I2C_PORT); // Inicializa o display OLED
+     ssd1306_config(&oled); // Configura o display OLED
+ 
+     while (true) {
+         float valor_adc = ler_adc(); // Lê o valor do ADC
+         float resistencia = calcular_resistencia(valor_adc); // Calcula a resistência medida
+ 
+         float melhor_valor_e24;
+         int melhor_exp, melhor_idx;
+         aproximar_e24(resistencia, &melhor_valor_e24, &melhor_exp, &melhor_idx); // Aproxima a resistência ao valor E24
+ 
+         const char *cores[3];
+         if (melhor_valor_e24 > 0) {
+             int base = (int)VALORES_E24[melhor_idx];
+             int d1 = base / 10, d2 = base % 10;
+             determinar_cores(d1, d2, melhor_exp, cores); // Determina as cores das faixas
+         } else {
+             cores[0] = cores[1] = cores[2] = "---";
+         }
+ 
+         atualizar_display(&oled, valor_adc, resistencia, melhor_valor_e24, cores); // Atualiza o display
+         sleep_ms(200); // Espera 200 milissegundos
+     }
+ 
+     return 0;
+ }
+ 

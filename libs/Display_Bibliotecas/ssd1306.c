@@ -14,8 +14,7 @@ void ssd1306_init(ssd1306_t *ssd, uint8_t width, uint8_t height, bool external_v
     if (ssd->ram_buffer != NULL) {
         ssd->ram_buffer[0] = 0x40; // Co = 0, D/C = 1
     }
-    ssd->port_buffer[0] = 0x80; 
-    
+    ssd->port_buffer[0] = 0x80;
 }
 
 void ssd1306_config(ssd1306_t *ssd) {
@@ -81,13 +80,10 @@ void ssd1306_fill(ssd1306_t *ssd, bool value) {
 
 void ssd1306_draw_small_number(ssd1306_t *ssd, char c, uint8_t x, uint8_t y) {
     if (c >= '0' && c <= '9') {
-        // Índice na fonte para o número correspondente
-        uint16_t index = ((c - '0') * 5) + (68 * 8); // Baseado na estrutura da fonte
-
+        uint16_t index = ((c - '0') * 5) + (69 * 8);
         for (uint8_t i = 0; i < 5; ++i) {
-            uint8_t line = font[index + i]; // Linha da matriz 5x5 do número
+            uint8_t line = font[index + i];
             for (uint8_t j = 0; j < 5; ++j) {
-                // Inverter a ordem dos bits ao desenhar
                 if ((line >> (4 - j)) & 0x01) {
                     ssd1306_pixel(ssd, x + j, y + i, true);
                 }
@@ -96,8 +92,6 @@ void ssd1306_draw_small_number(ssd1306_t *ssd, char c, uint8_t x, uint8_t y) {
     }
 }
 
-
-
 void ssd1306_draw_char(ssd1306_t *ssd, char c, uint8_t x, uint8_t y, bool use_small_numbers) {
     if (use_small_numbers && c >= '0' && c <= '9') {
         ssd1306_draw_small_number(ssd, c, x, y);
@@ -105,7 +99,7 @@ void ssd1306_draw_char(ssd1306_t *ssd, char c, uint8_t x, uint8_t y, bool use_sm
     }
 
     uint16_t index = 0;
-    bool rotate = false; // Flag para rotação
+    bool rotate = false;
 
     if (c >= '0' && c <= '9') {
         index = (c - '0' + 1) * 8;
@@ -114,27 +108,27 @@ void ssd1306_draw_char(ssd1306_t *ssd, char c, uint8_t x, uint8_t y, bool use_sm
     } else if (c >= 'a' && c <= 'z') {
         index = (c - 'a' + 37) * 8;
     } else if (c == ':') {
-        index = 64 * 8; // Índice para ':'
+        index = 64 * 8;
         rotate = true;
     } else if (c == '.') {
-        index = 65 * 8; // Índice para '.'
+        index = 65 * 8;
         rotate = true;
     } else if (c == '>') {
-        index = 66 * 8; // Índice para '>'
+        index = 66 * 8;
         rotate = true;
     } else if (c == '-') {
-        index = 67 * 8; // Índice para '-'
+        index = 67 * 8;
         rotate = true;
+    } else if (c == 127) {
+        index = 68 * 8; // Índice 68 para Ohm (Ω)
     }
 
     for (uint8_t i = 0; i < 8; ++i) {
         uint8_t line = font[index + i];
         for (uint8_t j = 0; j < 8; ++j) {
             if (rotate) {
-                // Rotaciona 90° para símbolos especiais
                 ssd1306_pixel(ssd, x + (7 - j), y + i, (line >> j) & 0x01);
             } else {
-                // Caracteres normais sem rotação
                 ssd1306_pixel(ssd, x + i, y + j, (line >> j) & 0x01);
             }
         }
@@ -144,21 +138,20 @@ void ssd1306_draw_char(ssd1306_t *ssd, char c, uint8_t x, uint8_t y, bool use_sm
 void ssd1306_draw_string(ssd1306_t *ssd, const char *str, uint8_t x, uint8_t y, bool use_small_numbers) {
     while (*str) {
         char c = *str;
-        uint8_t char_width = 8; // Padrão para caracteres normais
-        
+        uint8_t char_width = 8;
+
         if (use_small_numbers && c >= '0' && c <= '9') {
-            char_width = 5; // Largura reduzida para números pequenos
+            char_width = 5;
         }
 
-        // Verifica se o caractere cabe na linha atual
         if (x + char_width > ssd->width) {
             x = 0;
-            y += 8; // Próxima linha
-            if (y + 8 > ssd->height) break; // Sem espaço vertical
+            y += 8;
+            if (y + 8 > ssd->height) break;
         }
 
         ssd1306_draw_char(ssd, c, x, y, use_small_numbers);
-        x += char_width; // Avança a posição horizontal
+        x += char_width;
         str++;
     }
 }
@@ -205,4 +198,3 @@ void ssd1306_vline(ssd1306_t *ssd, uint8_t x, uint8_t y0, uint8_t y1, bool value
         ssd1306_pixel(ssd, x, y, value);
     }
 }
-

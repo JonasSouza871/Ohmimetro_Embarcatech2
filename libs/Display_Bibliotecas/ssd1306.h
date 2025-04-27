@@ -16,7 +16,7 @@ typedef struct {
     uint8_t port_buffer[2];
 } ssd1306_t;
 
-// Funções existentes permanecem iguais
+// Funçoes basicas
 void ssd1306_init(ssd1306_t *ssd, uint8_t width, uint8_t height, bool external_vcc, uint8_t address, i2c_inst_t *i2c);
 void ssd1306_config(ssd1306_t *ssd);
 void ssd1306_command(ssd1306_t *ssd, uint8_t command);
