@@ -11,13 +11,13 @@ typedef struct {
 
 // Paleta de cores para as faixas 
 const CorRGB PALETA_CORES[] = {
-    {"Preto", 0, 0, 0},
+    {"Preto", 0, 0, 0}, //cor preta não tem valor rgb
     {"Marrom",   30,   10,    10},  
     {"Vermelho", 190,   0,    0},  
     {"Laranja",  255,  90,    0},  
-    {"Amarelo",  255, 180,    0},  // Amarelo mais brilhante
+    {"Amarelo",  255, 180,    0},  
     {"Verde",     0,  150,    0},
-    {"Azul",      0,    0,  200},  // Azul mais forte
+    {"Azul",      0,    0,  200}, 
     {"Violeta", 130,    0,  130},  
     {"Cinza",    80,   80,   80},
     {"Branco",  255,  255,  255},  // Branco verdadeiro
