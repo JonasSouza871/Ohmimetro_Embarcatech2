@@ -9,21 +9,21 @@ typedef struct {
     uint8_t b;
 } CorRGB;
 
-// Paleta de cores para as faixas (Cores ajustadas para melhor diferenciação)
+// Paleta de cores para as faixas 
 const CorRGB PALETA_CORES[] = {
-    {"Preto",    0,   0,   0},
-    {"Marrom",   60,  30,  10},  // Marrom mais escuro e menos avermelhado
-    {"Vermelho", 150,  0,   0},
-    {"Laranja",  230, 100,  0},  // Laranja mais vibrante e claro
-    {"Amarelo",  150, 90,   0},  // Cor amarela ajustada (menos verde)
-    {"Verde",    0,  150,   0},
-    {"Azul",     0,   0,  150},
-    {"Violeta",  100,  0,  100},
-    {"Cinza",    80,  80,  80},
-    {"Branco",   100, 100, 100},
-    {"Prata",    192, 192, 192},
-    {"Ouro",     218, 165,  32},
-    {"---",      0,   0,   0}
+    {"Preto", 0, 0, 0},
+    {"Marrom",   30,   10,    10},  
+    {"Vermelho", 190,   0,    0},  
+    {"Laranja",  255,  90,    0},  
+    {"Amarelo",  255, 180,    0},  // Amarelo mais brilhante
+    {"Verde",     0,  150,    0},
+    {"Azul",      0,    0,  200},  // Azul mais forte
+    {"Violeta", 130,    0,  130},  
+    {"Cinza",    80,   80,   80},
+    {"Branco",  255,  255,  255},  // Branco verdadeiro
+    {"Prata",   192,  192,  192},
+    {"Ouro",    218,  165,   32},
+    {"---",      0,    0,    0}
 };
 
 const int NUM_PALETA = sizeof(PALETA_CORES) / sizeof(PALETA_CORES[0]);
