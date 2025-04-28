@@ -193,6 +193,18 @@ int main(void) {
         float valor_adc = ler_adc(); // Lê o valor do ADC
         float resistencia = calcular_resistencia(valor_adc); // Calcula a resistência
 
+        // Verifica se a resistência é maior que 500kΩ
+        if (resistencia > 500000.0f) {
+            desligar_matriz(); // Desliga a matriz LED
+             
+            ssd1306_fill(&oled, false); //limpa display
+            ssd1306_draw_string(&oled, "Nenhum resistor", 7, 20, false);
+            ssd1306_draw_string(&oled, "encontrado", 20, 30, false);
+            ssd1306_send_data(&oled);
+            
+            continue; 
+        }
+
         float melhor_valor_e24 = 0;
         int melhor_exp = -1, melhor_idx = -1;
         bool e24_encontrado = aproximar_e24(resistencia, &melhor_valor_e24, &melhor_exp, &melhor_idx); // Aproxima ao valor E24

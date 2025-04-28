@@ -3,11 +3,9 @@
 
 #include "pico/stdlib.h"
 #include "hardware/pio.h"
-// Certifique-se que o arquivo ws2812.pio está no diretório correto e
-// que o CMakeLists.txt está configurado para gerá-lo.
 #include "generated/ws2812.pio.h"
 
-#define PINO_WS2812 7   // Pino GPIO conectado ao DIN dos LEDs
+#define PINO_WS2812 7   // Pino GPIO 
 #define NUM_LINHAS    5   // Dimensão da matriz
 #define NUM_COLUNAS   5   // Dimensão da matriz
 #define NUM_PIXELS    (NUM_LINHAS * NUM_COLUNAS) // Total 25
