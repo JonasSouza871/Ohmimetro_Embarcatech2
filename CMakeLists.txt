@@ -1,4 +1,3 @@
-# == DO NOT EDIT THE FOLLOWING LINES for the Raspberry Pi Pico VS Code Extension to work ==
 if(WIN32)
     set(USERHOME $ENV{USERPROFILE})
 else()
@@ -19,7 +18,7 @@ cmake_minimum_required(VERSION 3.13)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
+set(PICO_BOARD pico_w CACHE STRING "Board type")
 # Configuração do SDK do Raspberry Pi Pico
 include(pico_sdk_import.cmake)
 
@@ -32,16 +31,15 @@ pico_sdk_init()
 # Adiciona os arquivos do programa
 add_executable(Ohmimetro
     main.c
-    libs/Matriz_Bibliotecas/matriz_led.c   # Mantido para uso futuro
-    libs/Display_Bibliotecas/ssd1306.c
+    lib/Matriz_Bibliotecas/matriz_led.c   # Mantido para uso futuro
+    lib/Display_Bibliotecas/ssd1306.c
 )
 
-# Adiciona os diretórios das bibliotecas customizadas ao include path
-target_include_directories(Ohmimetro PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/libs/Display_Bibliotecas
-    ${CMAKE_CURRENT_LIST_DIR}/libs/Matriz_Bibliotecas
-    ${CMAKE_CURRENT_LIST_DIR}/libs/Matriz_Bibliotecas/generated # Para o cabeçalho PIO
-)
+pico_generate_pio_header(Ohmimetro ${CMAKE_CURRENT_LIST_DIR}/lib/Matriz_Bibliotecas/ws2812.pio
+    OUTPUT_DIR ${CMAKE_CURRENT_LIST_DIR}/lib/Matriz_Bibliotecas/generated
+    )
+pico_set_program_name(Ohmimetro "Ohmimetro")
+pico_set_program_version(Ohmimetro "0.1") 
 
 # Habilita comunicação serial
 pico_enable_stdio_uart(Ohmimetro 1)

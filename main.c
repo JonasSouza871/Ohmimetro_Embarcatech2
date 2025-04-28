@@ -5,9 +5,9 @@
 #include "pico/stdlib.h"
 #include "hardware/adc.h"
 #include "hardware/i2c.h"
-#include "libs/Display_Bibliotecas/ssd1306.h"
-#include "libs/Display_Bibliotecas/font.h"
-#include "libs/Matriz_Bibliotecas/matriz_led.h"
+#include "lib/Display_Bibliotecas/ssd1306.h"
+#include "lib/Display_Bibliotecas/font.h"
+#include "lib/Matriz_Bibliotecas/matriz_led.h"
 
 // Definições de hardware
 #define I2C_PORT i2c1
@@ -193,8 +193,8 @@ int main(void) {
         float valor_adc = ler_adc(); // Lê o valor do ADC
         float resistencia = calcular_resistencia(valor_adc); // Calcula a resistência
 
-        // Verifica se a resistência é maior que 500kΩ
-        if (resistencia > 500000.0f) {
+        // Verifica se a resistência é maior que 450kΩ
+        if (resistencia > 450000.0f) {
             desligar_matriz(); // Desliga a matriz LED
              
             ssd1306_fill(&oled, false); //limpa display
